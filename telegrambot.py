@@ -1,9 +1,13 @@
 import asyncio
 import logging
+from enum import Enum
 
 from aiogram import Bot, Dispatcher, Router, types
 from aiogram.filters import Command
 from aiogram.types import Message
+
+from magic_filter import F
+from aiogram.filters import MagicData
 
 
 #Job processing
@@ -42,13 +46,11 @@ from pymongo import MongoClient
 class MenuCallback(CallbackData, prefix="my"):
     job_id: int
 
-class JobPost(StatesGroup):
-    name = State()  # Will be represented in storage as 'JobPost:name'
-    price = State()  # Will be represented in storage as 'JobPost:price'
-    description = State()  # Will be represented in storage as 'JobPost:description'
-
-class PostJobCallbackData(CallbackData, prefix="Post"):
-    answer: str
+class JobPosting(StatesGroup):
+    waiting_for_job_name = State()
+    waiting_for_job_description = State()
+    waiting_for_job_price = State()
+    waiting_for_job_location = State()
 
 
 # Bot token can be obtained via https://t.me/BotFather
@@ -62,21 +64,6 @@ jobs_collection = db['Jobs']  # Replace with your collection name
 
 # All handlers should be attached to the Router (or Dispatcher)
 router = Router()
-
-# builder = InlineKeyboardBuilder()
-# # Add five buttons with different fruits and prices
-# builder.button(text="Apple - $0.5", callback_data=MyCallback(fruit="apple", price=0.5).pack())
-# builder.button(text="Pear - $0.6", callback_data=MyCallback(fruit="pear", price=0.6).pack())
-# builder.button(text="Mango - $1.2", callback_data=MyCallback(fruit="mango", price=1.2).pack())
-# builder.button(text="Banana - $0.4", callback_data=MyCallback(fruit="banana", price=0.4).pack())
-# builder.button(text="Pineapple - $1.5", callback_data=MyCallback(fruit="pineapple", price=1.5).pack())
-# # Convert the keyboard builder into an actual InlineKeyboardMarkup object
-# markup = builder.as_markup()
-
-
-
-
-
 
 
 
@@ -120,15 +107,12 @@ async def command_help_handler(message: Message) -> None:
 
 
 
-# menu_builder = InlineKeyboardBuilder()
-# # Add five buttons with different fruits and prices
-# menu_builder.button(text="Lawn Mowing", callback_data=MenuCallback(job_id=1).pack())
-# menu_builder.button(text="Pool Cleaning", callback_data=MenuCallback(job_id=2).pack())
-# menu_markup = menu_builder.as_markup()
-
-
 async def create_menu():
     menu_builder = InlineKeyboardBuilder()
+
+    # Add 'Post a Job' button
+    post_job_button = InlineKeyboardButton(text="Post a Job", callback_data="action=start_post")
+    menu_builder.row(post_job_button)
 
     # Fetch jobs from database
     loop = asyncio.get_running_loop()
@@ -158,15 +142,13 @@ async def command_menu_handler(message: Message) -> None:
     await message.answer("Menu",reply_markup=menu_markup)
 
 
-# def my_callback_filter(query: types.CallbackQuery):
-#     callback_data = MyCallback.unpack(query.data)
-#     return callback_data.fruit in ["apple", "pear", "mango", "banana", "pineapple"]
+
 
 # MENU CALL BACK FUNCTIONS
 def menu_callback_filter(query: types.CallbackQuery):
     callback_data = MenuCallback.unpack(query.data)
     return callback_data.job_id in [1,2]
-#callback_data.job_name in ["20"],  callback_data.Price in ["20"],callback_data.Description in ["Unkept lawn need it mowed for inspection"]
+
 
 @router.callback_query(menu_callback_filter)
 async def my_menu_handler(query: types.CallbackQuery):
@@ -195,8 +177,6 @@ DESCRIPTION: {description}
 LOCATION: {location}                               
 """)
     
-
-
 
     await query.answer()
 
